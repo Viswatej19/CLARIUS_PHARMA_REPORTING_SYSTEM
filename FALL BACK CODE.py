@@ -225,9 +225,9 @@ def create_excel(df, buyer_key, buyer_text, inv_no, date_val, transport, lr_no, 
         style_cell(ws.cell(r, 10), value=num_fmt(row["Discount"]),align="center",num_format="#,##0.00", **dc)
         style_cell(ws.cell(r, 11), value=num_fmt(row["MRP"]),    align="center", num_format="#,##0.00", **dc)
         style_cell(ws.cell(r, 12), value=num_fmt(row["Taxable"]),align="center", num_format="#,##0.00", **dc)
-        style_cell(ws.cell(r, 13), value=float(row["CGST%"]), align="center", num_format="0.0", **dc)
+        style_cell(ws.cell(r, 13), value=num_fmt(row["CGST%"],0),align="center", num_format="0",        **dc)
         style_cell(ws.cell(r, 14), value=num_fmt(row["CGST Amt"]),align="center",num_format="#,##0.00", **dc)
-        style_cell(ws.cell(r, 15), value=float(row["SGST%"]), align="center", num_format="0.0", **dc)
+        style_cell(ws.cell(r, 15), value=num_fmt(row["SGST%"],0),align="center", num_format="0",        **dc)
         style_cell(ws.cell(r, 16), value=num_fmt(row["SGST Amt"]),align="center",num_format="#,##0.00", **dc)
         style_cell(ws.cell(r, 17), value=num_fmt(row["Total"]),  align="center", num_format="#,##0.00", **dc)
 
@@ -448,8 +448,8 @@ def create_pdf(df, buyer_text, inv_no, date_val, transport, lr_no, lr_date):
             C(pnum(row["Qty"], 0)), C(pnum(row["Free"], 0)),
             C(pnum(row["PTR"])), C(pnum(row["Discount"])),
             C(pnum(row["MRP"])), C(pnum(row["Taxable"])),
-            C(pnum(row["CGST%"], 1)), C(pnum(row["CGST Amt"])),
-            C(pnum(row["SGST%"], 1)), C(pnum(row["SGST Amt"])),
+            C(pnum(row["CGST%"], 0)), C(pnum(row["CGST Amt"])),
+            C(pnum(row["SGST%"], 0)), C(pnum(row["SGST Amt"])),
             C(pnum(row["Total"])),
         ])
 
@@ -619,7 +619,6 @@ with col2:
 with col3:
     today     = datetime.today().strftime("%d.%m.%Y")
     inv_no    = st.text_input("Inv No")
-    name      = st.text_input("File Name")
     date_val  = st.text_input("Date", value=today)
     transport = st.text_input("Transport")
     lr_no     = st.text_input("Lr No")
@@ -629,45 +628,25 @@ st.divider()
 
 num_products = st.selectbox("Number of Products", list(range(1, 11)))
 products = []
-PRODUCT_OPTIONS = [
-    "TRIENZO D","ALL JOINTS","TRIENZO","OMC","CEFSON 200",
-    "PENSEN DSR","EPRISPAS","THIFLEX A","HYLAGEN G",
-    "ACENT P","LIOSON M","ZOLID 600","TRACET",
-    "MECSONFORTE","MEGAVIT"
-]
+
 for i in range(num_products):
     st.markdown(f"**Product {i+1}**")
     c1 = st.columns(6)
-    pname = c1[0].selectbox(
-        "Product Name",
-        options=[""] + PRODUCT_OPTIONS + ["Other"],
-        key=f"pn{i}"
-    )
-    if pname == "Other":
-        pname = c1[0].text_input("Enter Product Name", key=f"pn_other{i}").upper()
-    packing = c1[1].text_input("Packing", key=f"pk{i}").upper()
-    hsn     = c1[2].text_input("HSN", key=f"hs{i}")
-    batch   = c1[3].text_input("Batch", key=f"ba{i}")
-    exp_date = c1[4].date_input("EXP", value=None, key=f"ex{i}")
-    exp = exp_date.strftime("%m/%y") if exp_date else ""
-
-    qty = c1[5].number_input("QTY", value=None, placeholder="Enter", key=f"qt{i}")
+    pname   = c1[0].text_input("Product Name", key=f"pn{i}")
+    packing = c1[1].text_input("Packing",       key=f"pk{i}")
+    hsn     = c1[2].text_input("HSN",           key=f"hs{i}")
+    batch   = c1[3].text_input("Batch",          key=f"ba{i}")
+    exp     = c1[4].text_input("EXP",            key=f"ex{i}")
+    qty     = c1[5].number_input("QTY",  value=0.0, key=f"qt{i}")
 
     c2 = st.columns(6)
-    free = c2[0].number_input("FREE",  value=None, placeholder="Enter", key=f"fr{i}")
-    ptr  = c2[1].number_input("PTR",   value=None, placeholder="Enter", key=f"pr{i}")
-    disc = c2[2].number_input("DISC",  value=None, placeholder="Enter", key=f"di{i}")
-    mrp  = c2[3].number_input("MRP",   value=None, placeholder="Enter", key=f"mr{i}")
-    cgst = 2.5
-    sgst = 2.5
+    free = c2[0].number_input("FREE",  value=0.0, key=f"fr{i}")
+    ptr  = c2[1].number_input("PTR",   value=0.0, key=f"pr{i}")
+    disc = c2[2].number_input("DISC",  value=0.0, key=f"di{i}")
+    mrp  = c2[3].number_input("MRP",   value=0.0, key=f"mr{i}")
+    cgst = c2[4].number_input("CGST%", value=0.0, key=f"cg{i}")
+    sgst = c2[5].number_input("SGST%", value=0.0, key=f"sg{i}")
 
-    c2[4].text_input("CGST%", value="2.5", disabled=True, key=f"cg{i}")
-    c2[5].text_input("SGST%", value="2.5", disabled=True, key=f"sg{i}")
-    qty  = qty  or 0
-    ptr  = ptr  or 0
-    disc = disc or 0
-    free = free or 0
-    mrp  = mrp  or 0
     taxable  = qty * (ptr - disc)
     cgst_amt = taxable * cgst / 100
     sgst_amt = taxable * sgst / 100
@@ -676,7 +655,7 @@ for i in range(num_products):
         "Product": pname, "Packing": packing, "HSN": hsn,
         "Batch": batch, "EXP": exp, "Qty": qty, "Free": free,
         "PTR": ptr, "Discount": disc, "MRP": mrp,
-        "Taxable": taxable, "CGST%": float(cgst), "SGST%": float(sgst),
+        "Taxable": taxable, "CGST%": cgst, "SGST%": sgst,
         "CGST Amt": cgst_amt, "SGST Amt": sgst_amt,
         "Total": taxable + cgst_amt + sgst_amt,
     })
@@ -703,7 +682,7 @@ if st.button("📄 Generate Invoice", disabled=not valid, type="primary"):
 
 if st.session_state.excel_file and st.session_state.pdf_file:
     st.success("✅ Invoice generated! Download below:")
-    fname = re.sub(r"[^a-zA-Z0-9]", "_", name or inv_no or "invoice")
+    fname = re.sub(r"[^a-zA-Z0-9]", "_", inv_no or "invoice")
     dl1, dl2 = st.columns(2)
     with dl1:
         st.download_button(
