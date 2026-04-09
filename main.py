@@ -1,0 +1,255 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import io
+import re
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+
+st.set_page_config(layout="wide")
+
+# ---------------- SELLER ----------------
+SELLER = """M/s CLARIUS PHARMA.
+D.NO.19-1-358/4A. LECTURERS COLONY.
+SRI RAMASAI NILAYAM PEDDAPURAM - 533437.
+DL NO'S : 20B-AP/04/06/2017-137922.
+21B-AP/04/06/2017-137923
+GSTIN - 37AKYPB8654K1ZB
+"""
+
+# ---------------- BUYERS ----------------
+BUYERS = {
+    "Mahalaxmi": "TO, MAHALAXMI MEDICALS. RAMAMAHAL LADIES GATE ROAD. R.R. PET. ELURU-2. GSTIN NO- 37AJDPK5246N1ZT. D L NO- 339/AP/WG/E2011/R",
+    "Balaji": "TO, M/s BALAJI M/G/S.TADEPALLLIGUDEM GSTIN NO-37BOPPP4153R1ZX . 20&21-AP/05/2015-125403;125404",
+    "Ramaswamy": "TO :RAMASWAMY MEDICALS C/O DR .POTUMUDI SRINIWAS NEAR SUBBAMMADEVI SCHOOL ELURU -2 PH : 8008143357 GSTIN :37ASHPM3995K1ZZ DL NO :140457-AP/05/01/2017 140458-AP/05/01/2017",
+    "Laxmi Medicals": "TO M/s LAXMI MEDICALS RETAIL SHOP, RAMARAOPET,KAKINADA, GSTIN-37ABIPV1833D1ZM.",
+    "Manikanta": "TO M/S SRI MANIKANTA MEDICALS.KOTHA ROAD.ELURU. D L NO ; 54 54 GSTIN ; 37ACPPD6515N1Z5",
+    "Madhura": "TO, MADHURA MEDICALS YELESWARAM. GSTIN NO-37ABEFM6531H1Z7. 20&21-985/AP/EG/R/2010/R",
+    "Datta Sai Medicals": "TO, SRI DATTA SAI MEDICAL STORES.R.R.PETA. ELURU. DL.NO--140/AP/WG/E/2009/R DL NO--140/AP/WG/E/2009/R GSTIN:37BRAPP1812M1ZO"
+}
+
+# ---------------- SAFE WRITE ----------------
+def write_safe(ws, cell, value):
+    for merged in ws.merged_cells.ranges:
+        if cell in merged:
+            ws.cell(merged.min_row, merged.min_col, value)
+            return
+    ws[cell] = value
+
+# ---------------- UI ----------------
+col1, col2, col3 = st.columns([2,2,1])
+
+with col1:
+    st.text_area("FROM", SELLER, height=150)
+
+with col2:
+    buyer_key = st.selectbox("Select Buyer", list(BUYERS.keys()))
+    st.text_area("TO", BUYERS[buyer_key], height=150)
+
+with col3:
+    today = datetime.today().strftime("%d.%m.%Y")
+    inv_no = st.text_input("Inv No")
+    date = st.text_input("Date", value=today)
+    transport = st.text_input("Transport")
+    Lr_No = st.text_input("Lr No")
+    Lr_Date = st.text_input("Lr Date")
+
+# ---------------- PRODUCTS ----------------
+num_products = st.selectbox("No of Products", list(range(1,11)))
+products = []
+
+for i in range(num_products):
+    c1 = st.columns(6)
+    pname = c1[0].text_input(f"Product {i}")
+    packing = c1[1].text_input(f"Packing {i}")
+    hsn = c1[2].text_input(f"HSN {i}")
+    batch = c1[3].text_input(f"Batch {i}")
+    exp = c1[4].text_input(f"EXP {i}")
+    qty = c1[5].number_input(f"QTY {i}", value=0.0)
+
+    c2 = st.columns(6)
+    free = c2[0].number_input(f"FREE {i}", value=0.0)
+    ptr = c2[1].number_input(f"PTR {i}", value=0.0)
+    disc = c2[2].number_input(f"DISC {i}", value=0.0)
+    mrp = c2[3].number_input(f"MRP {i}", value=0.0)
+    cgst = c2[4].number_input(f"CGST {i}", value=0.0)
+    sgst = c2[5].number_input(f"SGST {i}", value=0.0)
+
+    taxable = qty * (ptr - disc)
+    cgst_amt = taxable * cgst / 100
+    sgst_amt = taxable * sgst / 100
+    total = taxable + cgst_amt + sgst_amt
+
+    products.append({
+        "Product": pname,
+        "Packing": packing,
+        "HSN": hsn,
+        "Batch": batch,
+        "EXP": exp,
+        "Qty": qty,
+        "Free": free,
+        "PTR": ptr,
+        "Discount": disc,
+        "MRP": mrp,
+        "Taxable": taxable,
+        "CGST%": cgst,
+        "SGST%": sgst,
+        "CGST Amt": cgst_amt,
+        "SGST Amt": sgst_amt,
+        "Total": total
+    })
+
+df = pd.DataFrame(products)
+
+from openpyxl.utils import get_column_letter
+
+def smart_column_fit(ws):
+    col_widths = {}
+
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value:
+                col = cell.column
+                length = len(str(cell.value))
+                col_widths[col] = max(col_widths.get(col, 0), length)
+
+    for col, width in col_widths.items():
+        adjusted = min((width * 1.2) + 2, 35)
+        ws.column_dimensions[get_column_letter(col)].width = adjusted
+
+
+def adjust_row_heights(ws):
+    for row in ws.iter_rows():
+        max_lines = 1
+        for cell in row:
+            if cell.value:
+                lines = str(cell.value).count("\n") + 1
+                max_lines = max(max_lines, lines)
+
+        ws.row_dimensions[row[0].row].height = max_lines * 15
+
+
+def apply_clean_font(ws):
+    from openpyxl.styles import Font
+    for row in ws.iter_rows():
+        for cell in row:
+            cell.font = Font(name="Calibri", size=10)
+
+
+def setup_print(ws):
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+
+    ws.page_setup.fitToHeight = 1
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.scale = None
+
+    ws.page_setup.horizontalCentered = True
+    ws.page_setup.verticalCentered = True
+
+    ws.page_margins.left = 0.3
+    ws.page_margins.right = 0.3
+    ws.page_margins.top = 0.5
+    ws.page_margins.bottom = 0.5
+# ---------------- EXCEL ----------------
+def create_excel(df, buyer, inv_no, date):
+    wb = load_workbook("template.xlsx")
+    ws = wb.active
+
+    # HEADER
+    write_safe(ws, "A2", SELLER)
+    write_safe(ws, "F2", buyer)
+
+    # Apply bold to buyer (merged block F2:M2)
+    for col in range(6, 14):  # F=6, M=13
+        cell = ws.cell(2, col)
+        cell.font = Font(bold=True)
+    write_safe(ws, "N2", f"Inv No: {inv_no}\nDate: {date}\nTransport: {transport}\nLr No: {Lr_No}\nLr Date: {Lr_Date}")
+
+    # PRODUCTS
+    start = 5
+    for i, row in df.iterrows():
+        r = start + i
+
+        write_safe(ws, f"A{r}", i+1)
+        write_safe(ws, f"B{r}", row["Product"])
+        write_safe(ws, f"C{r}", row["Packing"])
+        write_safe(ws, f"D{r}", row["HSN"])
+        write_safe(ws, f"E{r}", row["Batch"])
+        write_safe(ws, f"F{r}", row["EXP"])
+        write_safe(ws, f"G{r}", row["Qty"])
+        write_safe(ws, f"H{r}", row["Free"])
+        write_safe(ws, f"I{r}", row["PTR"])
+        write_safe(ws, f"J{r}", row["Discount"])
+        write_safe(ws, f"K{r}", row["MRP"])
+        write_safe(ws, f"L{r}", row["Taxable"])
+        write_safe(ws, f"M{r}", row["CGST%"])
+        write_safe(ws, f"N{r}", row["CGST Amt"])
+        write_safe(ws, f"O{r}", row["SGST%"])
+        write_safe(ws, f"P{r}", row["SGST Amt"])
+        write_safe(ws, f"Q{r}", row["Total"])
+
+    # SUMMARY
+    subtotal = df["Taxable"].sum()
+    gst_total = df["CGST Amt"].sum() + df["SGST Amt"].sum()
+    net = subtotal + gst_total
+
+    total_items = len(df)
+    total_units = df["Qty"].sum()
+    total_discount = (df["Qty"] * df["Discount"]).sum()
+
+    write_safe(ws, "M12", f"SUB TOTAL : {subtotal}")
+    write_safe(ws, "M13", f"LESS DISC : {total_discount}")
+    write_safe(ws, "M14", f"GST AMT : {gst_total}")
+    write_safe(ws, "M15", f"CR AMT : 0")
+    write_safe(ws, "Q17", net)
+
+    write_safe(ws, "I12", f"NO OF ITEMS : {total_items}")
+    write_safe(ws, "I13", f"NO OF UNITS : {total_units}")
+
+    # GST
+    gst_rows = {0:12, 5:13, 12:14, 18:15, 28:16}
+    summary = {}
+
+    for _, row in df.iterrows():
+        gst = int(row["CGST%"] + row["SGST%"])
+        summary.setdefault(gst, {"tax":0,"cgst":0,"sgst":0})
+        summary[gst]["tax"] += row["Taxable"]
+        summary[gst]["cgst"] += row["CGST Amt"]
+        summary[gst]["sgst"] += row["SGST Amt"]
+
+    for gst, r in gst_rows.items():
+        data = summary.get(gst, {"tax":0,"cgst":0,"sgst":0})
+
+        write_safe(ws, f"B{r}", data["tax"])
+        write_safe(ws, f"C{r}", data["cgst"])
+        write_safe(ws, f"E{r}", data["tax"])
+        write_safe(ws, f"G{r}", data["sgst"])
+
+    output = io.BytesIO()
+
+    smart_column_fit(ws)
+    adjust_row_heights(ws)
+    apply_clean_font(ws)
+    setup_print(ws)
+
+    ws.print_area = "A1:Q18"
+
+    wb.save(output)
+    return output.getvalue()
+
+# ---------------- RUN ----------------
+if "file" not in st.session_state:
+    st.session_state.file = None
+
+valid = any(p["Taxable"] > 0 for p in products)
+
+if st.button("Generate Bill", disabled=not valid):
+    st.session_state.file = create_excel(df, BUYERS[buyer_key], inv_no, date)
+
+if st.session_state.file:
+    st.download_button(
+        "Download Excel",
+        st.session_state.file,
+        file_name=f"{re.sub('[^a-zA-Z0-9]', '_', inv_no or 'invoice')}.xlsx"
+    )
