@@ -633,19 +633,31 @@ PRODUCT_OPTIONS = [
     "TRIENZO D","ALL JOINTS","TRIENZO","OMC","CEFSON 200",
     "PENSEN DSR","EPRISPAS","THIFLEX A","HYLAGEN G",
     "ACENT P","LIOSON M","ZOLID 600","TRACET",
-    "MECSONFORTE","MEGAVIT"
+    "MECSONFORTE","MEGAVIT", "D CART 6" 
 ]
 for i in range(num_products):
     st.markdown(f"**Product {i+1}**")
     c1 = st.columns(6)
-    pname = c1[0].selectbox(
+    pname_option = c1[0].selectbox(
         "Product Name",
         options=[""] + PRODUCT_OPTIONS + ["Other"],
         key=f"pn{i}"
     )
-    if pname == "Other":
-        pname = c1[0].text_input("Enter Product Name", key=f"pn_other{i}").upper()
-    packing = c1[1].text_input("Packing", key=f"pk{i}").upper()
+
+    if pname_option == "Other":
+        pname = c1[0].text_input("Enter Product Name", key=f"pn_other{i}")
+    else:
+        pname = pname_option
+
+    pname = (pname or "").upper()
+    packing = c1[1].selectbox(
+        "Packing",
+        options=[
+            "1 x 10", "2 x 10", "3 x 10", "4 x 10", "5 x 10",
+            "6 x 10", "7 x 10", "8 x 10", "9 x 10", "10 x 10"
+        ],
+        key=f"pk{i}"
+    )
     hsn     = c1[2].text_input("HSN", key=f"hs{i}")
     batch   = c1[3].text_input("Batch", key=f"ba{i}")
     exp_date = c1[4].date_input("EXP", value=None, key=f"ex{i}")
