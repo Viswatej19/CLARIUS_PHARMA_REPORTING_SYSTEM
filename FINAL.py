@@ -654,7 +654,7 @@ for i in range(num_products):
     packing = c1[1].selectbox(
         "Packing",
         options=[
-            "1 x 10", "2 x 10", "3 x 10", "4 x 10", "5 x 10",
+            "1 x 10", "1 x 15" "2 x 10", "3 x 10", "4 x 10", "5 x 10",
             "6 x 10", "7 x 10", "8 x 10", "9 x 10", "10 x 10"
         ],
         key=f"pk{i}"
