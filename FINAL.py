@@ -654,7 +654,7 @@ for i in range(num_products):
     packing = c1[1].selectbox(
         "Packing",
         options=[
-            "1 x 10", "1 x 15" "2 x 10", "3 x 10", "4 x 10", "5 x 10",
+            "1 x 10", "1 x 15" ,"2 x 10", "3 x 10", "4 x 10", "5 x 10",
             "6 x 10", "7 x 10", "8 x 10", "9 x 10", "10 x 10"
         ],
         key=f"pk{i}"
@@ -671,7 +671,7 @@ for i in range(num_products):
     ptr  = c2[1].number_input("PTR",   value=None, placeholder="Enter", key=f"pr{i}")
     disc = c2[2].number_input("DISC",  value=None, placeholder="Enter", key=f"di{i}")
     mrp  = c2[3].number_input("MRP",   value=None, placeholder="Enter", key=f"mr{i}")
-    cgst = 2.5
+    cgst = 2.5s
     sgst = 2.5
 
     c2[4].text_input("CGST%", value="2.5", disabled=True, key=f"cg{i}")
